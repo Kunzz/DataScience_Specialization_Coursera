@@ -1,0 +1,93 @@
+---
+title: "MileStoneReport"
+author: "KunZhu"
+date: "September 3, 2016"
+output: html_document
+---
+
+This milestone reported is produced fullfill the requirement of Data Science Specialization Capstone offered by Johns Hopkins University on Coursera. The purpose of this report is to document the initial tasks to prepare the data and perform exploratory analysis. 
+
+The downloaded data was processed and its statistics, e.g., file size, word counts, etc., are presented as part of the exploratory analysis results. Next, the raw data was cleaned by removing swear words (profanity), punctuation, and white space. Furthermore, a word cloud is used to illustrate the high frequency words in the data. The future tasks necessary to complish the project goal are outlined to conclude this milestone report.
+
+### Data Retrieving
+
+The raw data is downloaded from HC Corpora via the link. The datasets in English are studied in this project.
+
+```{r, warning=FALSE, message=FALSE}
+suppressWarnings(library("stringi"))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(tm))
+suppressWarnings(library(slam))
+suppressWarnings(library(wordcloud))
+
+fileLink <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+filePath <- "~/Coursera-SwiftKey.zip"
+if(!file.exists(filePath)) {
+    download.file(fileLink, destfile = filePath)
+    unzip(filePath)
+    }
+```
+### Loading data and preprocessing
+The exploratory analysis results of data from each txt file are presented in this sections.
+```{r, warning=FALSE, message=FALSE}
+blogs <- readLines("/Users/KunZhu/Dropbox/Coursera/final/en_US/en_US.blogs.txt")
+news <- readLines("/Users/KunZhu/Dropbox/Coursera/final/en_US/en_US.news.txt")
+tw <- readLines("/Users/KunZhu/Dropbox/Coursera/final/en_US/en_US.twitter.txt")
+```
+The line and character statistics for the data are presented below:
+```{r, warning=FALSE, message=FALSE}
+stri_stats_general(blogs)
+stri_stats_general(news)
+stri_stats_general(tw)
+
+```
+The histogram of the word counts are presented below:
+
+```{r, warning=FALSE, message=FALSE}
+wordSummary<-lapply(list(blogs, news, tw), function(x) stri_count_words(x))
+
+qplot(wordSummary[[1]], geom="histogram", main="US Blogs Histogram",  xlab="Word counts", ylab="Frequency", binwidth = 8)
+qplot(wordSummary[[2]], geom="histogram", main="US News Histogram",  xlab="Word counts", ylab="Frequency", binwidth = 8)
+qplot(wordSummary[[3]], geom="histogram", main="US Twitters Histogram",  xlab="Word counts", ylab="Frequency", binwidth = 5)
+
+```
+
+### Clean and build data corpus
+
+The data is cleaned and a corpus is created for data from each source. The data cleansing actions includes: removing punctuations, white spaces, numbers and swear words (download swearWords.txt from http://www.bannedwordlist.com/) together with coverting text to lowecase. 
+```{r, warning=FALSE, message=FALSE}
+writeLines(c(blogs[sample(1:length(blogs), 8000)], news[sample(1:length(news), 8000)], tw[sample(1:length(tw), 8000)]), "/Users/KunZhu/Dropbox/Coursera/final/en_US/sampleText.txt")
+
+```
+
+```{r, warning=FALSE, message=FALSE}
+inputText <- readLines("/Users/KunZhu/Dropbox/Coursera/final/en_US/sampleText.txt")
+badWords <- readLines("/Users/KunZhu/Dropbox/Coursera/final/en_US/bad.txt")
+contentToLower <- content_transformer(tolower)
+
+Corpus <- Corpus(VectorSource(inputText))
+Corpus <- tm_map(Corpus, content_transformer(function(x, pattern) gsub(pattern, " ", x)), "/|@|\\|")
+Corpus <- tm_map(Corpus, removePunctuation)
+Corpus <- tm_map(Corpus, contentToLower)
+Corpus <- tm_map(Corpus, stripWhitespace)
+Corpus <- tm_map(Corpus, removeNumbers)
+Corpus <- tm_map(Corpus, removeWords, badWords, lazy = TRUE)
+```
+
+### Analysis of Corpus
+A word cloud is created for the readers to have a conceputal understanding of the content and high frequency words in the corpus. The most common words in the corpus are also the common words in the english language.
+```{r, warning=FALSE, message=FALSE}
+sumRowCorpus <- row_sums(TermDocumentMatrix(Corpus))
+freq <- sort(sumRowCorpus, decreasing = TRUE)
+freq.name <- names(freq)
+slab <- data.frame(wordName = freq.name, wordFreq = freq)
+wordcloud(slab$wordName, slab$wordFreq, c(3, 1), rot.per= 0.75, max.words = 200, random.order = FALSE,  colors = brewer.pal(8, "Dark2"))
+```
+
+### Plans for the later tasks
+The future tasks necessary to acomplish the project goal are to:
+
+* Generating tokens of one to four words using n-grams
+* Summarize and pruning (if necessary in case the performance is bad) token frequency
+* Building a predictive model using the identified tokens
+* Wrapping up the results and the developed model as a data product, shiny app.
