@@ -1,0 +1,84 @@
+---
+title: "Regression Model Project"
+author: "Kun Zhu"
+output:
+  word_document: default
+  pdf_document:
+    keep_tex: yes
+    toc: yes
+  html_document: default
+---
+
+### Executive Summary
+This report represents a empirical study on the relationship between miles per gallon (MPG) and type of transmission, i.e., automatic and manual. The studied dataset includes fuel consumption and 10 aspects of automobile design and performance for 32 automobiles. 
+
+By intuition, a manual transmission car outperforms a car with automatic transmission by offering better MPG. A naive regression study agrees with the above claim by suggesting the manual transmission car offers about 7 extra MPG. However, the detailed regression study leads to a different conclusion that weight is a cofounder that can also impact the MPG. Specially, the manual transmission can offer MPG benefit when the cars are light, e.g., below 3000 lbs. However, as the car gets heavier, weight becomes a more important factor than tranmission in terms of MPG benefit.
+
+### Exploratory data analysis
+```{r}
+head(mtcars, 2)
+```
+Boxplot using ggplot package can be found in the Appendix. A t-test is performed with a null hypothesis that automatic and manual transmission cars offer the same MPG. The underlying assumption is that MPG is normally distributed.
+```{r}
+meanDiff <- t.test(mtcars$mpg ~ mtcars$am)
+meanDiff$p.value; meanDiff$estimate
+```
+As the p-value is smaller than 0.05, the null hypothesis above is rejected. Therefore, the inference study above suggests that cars with manual transmission in average offers extra, ```24.39 - 17.15 = 7.14```, MPG than automatic tranmission cars. 
+
+### Regression analysis
+```{r}
+fitAm <- lm(mpg ~ am, data = mtcars)
+summary(fitAm)$coefficients; summary(fitAm)$adj.r.squared
+```
+For this model, the intercept is equal to the average MPG of automatic transmissions. Similarly, the sum of the intercept and slope coefficients is equal to the average MPG among manual transmissions. However, the adjusted r square suggests that this model can only explain 33% of the MPG variance.
+
+The backward selection is used to select the model including statistically significant variables.
+```{r, results="hide"}
+fitAll <- lm(mpg ~ ., data = mtcars)
+stepModel <- step(fitAll, k=log(nrow(mtcars))); summary(stepModel)
+```
+The model with ```mpg ~ wt + qsec + am ``` is chosen, as it returns the largest adjusted r square value, 0.8336. This means that the model can explain about 83% of the MPG variance. In addition, all coefficients are significant at 0.05 significant level. 
+
+Next, the interaction of the variable "wt", "qsec", "am" are also considered in the model. Specially, the model selection is made by examine the variance table of nested models, see details in Appendix. The study suggests the best option among the candidate models is: 
+```{r}
+fitAmIntWt <- lm(mpg ~ wt + qsec + am + am*wt, data=mtcars)
+summary(fitAmIntWt)$coefficients[4:5, ]
+````
+Manual transmission contributes to ```14.079 - 4.141*wt``` extra MPG on average than cars with automatic transmission, while hold "wt" (weight lb/1000) and "qsec" constant. The assumption that manual transmission car leads to advantage in MPG holds when the car is light. For example, a 1500 lb car with manual transmission can provide 7.87 extra MPG. However, the assumption no longer holds when the car is heavy. For example, a 3500 lb manual transmission car actually leads to 0.42 less MPG. The 95% confidence interval can be found in Appendix.
+
+### Residual Analysis and Diagnostics
+The followings are shown in the residual plot, provided in Appendix:
+
+* No correlation is observed from the Residuals/Fitted plot
+* The QQ plot suggests that the residuals are normally distributed as the points reside along the line
+* No patterns are observed from the Scale-Location.
+* No outliers are observed from the Residuals/Leverage plot, as all values are within the 0.5 bands.
+
+### Appendix
+
+#### Exploratory data analysis, boxplot 
+```{r}
+library(ggplot2)
+mtcars$am <- as.factor(mtcars$am)
+levels(mtcars$am) <- c("automatic", "manual")
+p <- ggplot(mtcars, aes(x = am, y = mpg))
+p + geom_boxplot(width = .1, fill = "white", outlier.color=NA) + 
+  labs(x="Car Transmission",y="MPG")
+```
+
+#### Regression analysis, nested model variance table 
+````{r}
+fit <- lm(mpg ~ wt + qsec + am, mtcars)
+fitAmIntWt<- lm(mpg ~ wt + qsec + am + am*wt, data=mtcars)
+fitAmIntQsec <- lm(mpg ~ wt + qsec + am  + am*wt + am*qsec, data=mtcars)
+fitAmIntQsecWt <- lm(mpg ~ wt + qsec + am + am*wt + am*qsec + wt*qsec, data=mtcars)
+anova(fit, fitAmIntWt, fitAmIntQsec, fitAmIntQsecWt)
+confint(fitAmIntWt)[4:5, ]
+```
+The p-value of model ```fitAmIntWt``` is smaller than 0.05 while p-values for ```fitAmIntQsec``` and ```fitAmIntQsecWt``` are greater than 0.05. This clearly shows that it is necessary to add term ```am*wt``` to the model while other interaction terms should be avoided.
+
+#### Residual Analysis and Diagnostics, residual plot
+```{r}
+par(mfrow=c(2,2))
+plot(fitAmIntWt)
+```
